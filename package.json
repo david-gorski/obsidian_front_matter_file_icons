@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-sample-plugin",
-  "version": "0.12.0",
-  "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+  "name": "obsidian-emoji-file-icons",
+  "version": "1.0.1",
+  "description": "Parses yaml front-matter for an emoji field. If present displays as the file icon in the file browser. Can also configure to display in front of note name.",
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",

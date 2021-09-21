@@ -1,4 +1,14 @@
-/* Sets all the text color to red! */
-body {
-    color: red;
+.obsidian-icon-dg-icon {
+    border: 1px solid transparent;
+    padding: 2px 2px 2px 2px;
+    display: flex;
+    margin: auto 0;
+}
+
+.obsidian-icon-dg-title-icon {
+    border: 1px solid transparent;
+    padding: 2px 10px 2px 2px;
+    display: flex;
+    margin: auto 0;
+    float: left;
 }

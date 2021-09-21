@@ -1,56 +1,81 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TAbstractFile } from 'obsidian';
+
+import { addToDOM, removeFromDOM, addIconsToDOM, removeIconsFromDOM, addIconsToDOMAtStartup } from "./utils";
 
 interface MyPluginSettings {
-	mySetting: string;
+	iconFieldName: string;
+	iconFiles: Map<string, string>;
+	showIconsInFileExplorer: boolean;
+	showIconsInFileNameTitleBar: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	iconFieldName: 'icon',
+	iconFiles: new Map<string, string>(),
+	showIconsInFileExplorer: true,
+	showIconsInFileNameTitleBar: true
 }
 
-export default class MyPlugin extends Plugin {
+export default class FileIconPlugin extends Plugin {
 	settings: MyPluginSettings;
 
 	async onload() {
-		console.log('loading plugin');
-
+		
+		console.log('loading File Icon Plugin');
 		await this.loadSettings();
 
-		this.addRibbonIcon('dice', 'Sample Plugin', () => {
-			new Notice('This is a notice!');
+		// 1. On initialization insert all file icons
+		this.app.workspace.onLayoutReady(() => {
+			this.reloadIconFileList()
+			addIconsToDOMAtStartup(this, this.settings.iconFiles);
 		});
 
-		this.addStatusBarItem().setText('Status Bar Text');
+		// 2. On changes to layout reinsert icons
+		// unnecessary it seems and it will just impact performance
+		// this.registerEvent(
+		// 	this.app.workspace.on('layout-change', () => {
+		// 		addIconsToDOM(this, this.settings.iconFiles);
+		// 	}),
+		// );
+		
+		// 3. On file modification, update file icon
+		this.registerEvent(this.app.workspace.on("file-open", (file) => this.updateCurrentFileIcon(file)));
+		this.registerEvent(this.app.vault.on("modify", (file) => this.updateCurrentFileIcon(file)));
 
-		this.addCommand({
-			id: 'open-sample-modal',
-			name: 'Open Sample Modal',
-			// callback: () => {
-			// 	console.log('Simple Callback');
-			// },
-			checkCallback: (checking: boolean) => {
-				let leaf = this.app.workspace.activeLeaf;
-				if (leaf) {
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-					return true;
-				}
-				return false;
+
+		// 4. Have settings menu
+		this.addSettingTab(new FileIconSettingsTab(this.app, this)); 
+	}
+
+	updateCurrentFileIcon(file: TAbstractFile) {
+		const frontmatter = this.app.metadataCache.getCache(file.path)?.frontmatter
+		if (frontmatter) {
+			if (frontmatter[this.settings.iconFieldName]) {
+				this.settings.iconFiles.set(file.path, frontmatter[this.settings.iconFieldName])
+				removeFromDOM(file.path);
+				addToDOM(this, file.path, this.settings.iconFiles.get(file.path))
+			}else{
+				this.settings.iconFiles.delete(file.path)
+				removeFromDOM(file.path);
 			}
-		});
+		}else{
+			this.settings.iconFiles.delete(file.path)
+			removeFromDOM(file.path);
+		}
+	}
 
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		this.registerCodeMirror((cm: CodeMirror.Editor) => {
-			console.log('codemirror', cm);
-		});
-
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+	reloadIconFileList(){
+		this.settings.iconFiles.clear()
+		const files = this.app.vault.getFiles();
+		const markdownFiles = this.app.vault.getMarkdownFiles()
+		for (const f of markdownFiles){
+			const frontmatter = this.app.metadataCache.getFileCache(f)?.frontmatter
+			if (frontmatter){
+				if (frontmatter[this.settings.iconFieldName]) {
+					this.settings.iconFiles.set(f.path, frontmatter[this.settings.iconFieldName])
+				}
+			}
+		}
 	}
 
 	onunload() {
@@ -63,29 +88,17 @@ export default class MyPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		removeIconsFromDOM(this, this.settings.iconFiles)
+		this.reloadIconFileList()
+		addIconsToDOM(this, this.settings.iconFiles)
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+class FileIconSettingsTab extends PluginSettingTab {
+	plugin: FileIconPlugin;
 
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: FileIconPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -94,18 +107,33 @@ class SampleSettingTab extends PluginSettingTab {
 		let {containerEl} = this;
 
 		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		
+		new Setting(containerEl)
+			.setName('Show Icon in File Explorer')
+			.addToggle((comp) => comp
+			.setValue(this.plugin.settings.showIconsInFileExplorer)
+			.onChange(async (value) => {
+				this.plugin.settings.showIconsInFileExplorer = value;
+				await this.plugin.saveSettings();
+			}));
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('Show Icon in File Title Bar')
+			.addToggle((comp) => comp
+			.setValue(this.plugin.settings.showIconsInFileNameTitleBar)
+			.onChange(async (value) => {
+				this.plugin.settings.showIconsInFileNameTitleBar = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('Front-Matter Icon Field')
+			.setDesc('The name of the front-matter field that specifies the file icon')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue('')
+				.setPlaceholder('icon')
+				.setValue(this.plugin.settings.iconFieldName)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.iconFieldName = value;
 					await this.plugin.saveSettings();
 				}));
 	}
