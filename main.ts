@@ -4,30 +4,30 @@ import { addToDOM, removeFromDOM, addIconsToDOM, removeIconsFromDOM, addIconsToD
 
 interface MyPluginSettings {
 	iconFieldName: string;
-	iconFiles: Map<string, string>;
 	showIconsInFileExplorer: boolean;
 	showIconsInFileNameTitleBar: boolean;
+	insertBefore: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	iconFieldName: 'icon',
-	iconFiles: new Map<string, string>(),
 	showIconsInFileExplorer: true,
-	showIconsInFileNameTitleBar: true
+	showIconsInFileNameTitleBar: true,
+	insertBefore: true
 }
 
 export default class FileIconPlugin extends Plugin {
 	settings: MyPluginSettings;
+	iconFiles = new Map<string, string>(); // maps file path to icon string
 
 	async onload() {
-		
-		console.log('loading File Icon Plugin');
 		await this.loadSettings();
+		
 
 		// 1. On initialization insert all file icons
 		this.app.workspace.onLayoutReady(() => {
 			this.reloadIconFileList()
-			addIconsToDOMAtStartup(this, this.settings.iconFiles);
+			addIconsToDOMAtStartup(this, this.iconFiles);
 		});
 
 		// 2. On changes to layout reinsert icons
@@ -51,28 +51,28 @@ export default class FileIconPlugin extends Plugin {
 		const frontmatter = this.app.metadataCache.getCache(file.path)?.frontmatter
 		if (frontmatter) {
 			if (frontmatter[this.settings.iconFieldName]) {
-				this.settings.iconFiles.set(file.path, frontmatter[this.settings.iconFieldName])
+				this.iconFiles.set(file.path, frontmatter[this.settings.iconFieldName])
 				removeFromDOM(file.path);
-				addToDOM(this, file.path, this.settings.iconFiles.get(file.path))
+				addToDOM(this, file.path, this.iconFiles.get(file.path))
 			}else{
-				this.settings.iconFiles.delete(file.path)
+				this.iconFiles.delete(file.path)
 				removeFromDOM(file.path);
 			}
 		}else{
-			this.settings.iconFiles.delete(file.path)
+			this.iconFiles.delete(file.path)
 			removeFromDOM(file.path);
 		}
 	}
 
 	reloadIconFileList(){
-		this.settings.iconFiles.clear()
+		this.iconFiles.clear()
 		const files = this.app.vault.getFiles();
 		const markdownFiles = this.app.vault.getMarkdownFiles()
 		for (const f of markdownFiles){
 			const frontmatter = this.app.metadataCache.getFileCache(f)?.frontmatter
 			if (frontmatter){
 				if (frontmatter[this.settings.iconFieldName]) {
-					this.settings.iconFiles.set(f.path, frontmatter[this.settings.iconFieldName])
+					this.iconFiles.set(f.path, frontmatter[this.settings.iconFieldName])
 				}
 			}
 		}
@@ -88,9 +88,9 @@ export default class FileIconPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-		removeIconsFromDOM(this, this.settings.iconFiles)
+		removeIconsFromDOM(this, this.iconFiles)
 		this.reloadIconFileList()
-		addIconsToDOM(this, this.settings.iconFiles)
+		addIconsToDOM(this, this.iconFiles)
 	}
 }
 
@@ -136,5 +136,17 @@ class FileIconSettingsTab extends PluginSettingTab {
 					this.plugin.settings.iconFieldName = value;
 					await this.plugin.saveSettings();
 				}));
+		
+		containerEl.createEl('h2', {text: 'Settings for theme compatibility.'});
+
+		new Setting(containerEl)
+			.setName('Insert Before vs After file explorer element')
+			.addToggle((comp) => comp
+			.setValue(this.plugin.settings.insertBefore)
+			.onChange(async (value) => {
+				this.plugin.settings.insertBefore = value;
+				await this.plugin.saveSettings();
+			}));
+ 
 	}
 }

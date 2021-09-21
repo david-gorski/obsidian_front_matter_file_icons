@@ -26,7 +26,12 @@ export const addIconsToDOMAtStartup = (
                 iconNode.classList.add('obsidian-icon-dg-icon');
                 iconNode.innerHTML = getIconFrom(data.get(path));
 
-                titleEl.insertBefore(iconNode, titleInnerEl);
+
+                if(plugin.settings.insertBefore){
+                    titleEl.insertBefore(iconNode, titleInnerEl);
+                }else{
+                    titleEl.insertBefore(iconNode, titleInnerEl.nextSibling);
+                }
             }
         }
     }
@@ -89,7 +94,11 @@ export const addIconsToDOM = (
                 const iconNode = document.createElement('div');
                 iconNode.classList.add('obsidian-icon-dg-icon');
                 iconNode.innerHTML = getIconFrom(icon);
-                node.insertBefore(iconNode, titleNode);
+                if(plugin.settings.insertBefore){
+                    node.insertBefore(iconNode, titleNode);
+                }else{
+                    node.insertBefore(iconNode, titleNode.nextSibling)
+                }
             }
         }
     }
