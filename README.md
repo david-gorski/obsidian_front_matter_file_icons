@@ -20,3 +20,5 @@ icon: "🚀"
 - [ ] Default Icon Option
 - [ ] Image Icons
 - [ ] URL to Icons
+- [ ] Get working on mobile
+- [ ] Publish to official plugins list
